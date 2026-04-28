@@ -1,71 +1,106 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FaSearch } from "react-icons/fa";
 import './SearchBar.css';
 
-
-const API_KEY = "3904a47b-d206-41eb-8ad3-0c76201841f5";
+const API_KEY = "b20b5013-663e-4862-99b8-c05b69831846";
 
 const SearchBar = ({ setPlayerData }) => {
   const [username, setUserName] = useState("");
   const [loading, setLoading] = useState(false);
+  const [history, setHistory] = useState([]);
   const navigate = useNavigate();
 
-  const handleSearch = async (e) => {
-    e.preventDefault();
-    if (!username.trim()) return;
+  // Load history on mount
+  useEffect(() => {
+    const saved = JSON.parse(localStorage.getItem("hypixel_history")) || [];
+    setHistory(saved);
+  }, []);
 
-    setLoading(true);
-    try {
-      // 1. Get UUID from Mojang (using a more reliable public proxy for browsers)
-      const mojangRes = await fetch(`https://api.ashcon.app/mojang/v2/user/${username.trim()}`);
+  const saveHistory = (name) => {
+    // FIX: Use the functional update (prevHistory) to ensure we always have the latest list
+    setHistory((prevHistory) => {
+      const cleaned = [
+        name, 
+        ...prevHistory.filter(h => h.toLowerCase() !== name.toLowerCase())
+      ].slice(0, 5);
       
-      if (!mojangRes.ok) {
-        alert("Minecraft player not found. Check the spelling!");
-        setLoading(false);
-        return;
-      }
+      localStorage.setItem("hypixel_history", JSON.stringify(cleaned));
+      return cleaned;
+    });
+  };
 
-      const mojangData = await mojangRes.json();
-      const uuid = mojangData.uuid.replace(/-/g, ""); // Hypixel prefers UUIDs without dashes
+  const fetchData = async (name) => {
+    if (!name || !name.trim()) return;
+    setLoading(true);
+    
+    try {
+      // 1. Get UUID (using ashcon app which handles CORS better)
+      const mRes = await fetch(`https://api.ashcon.app/mojang/v2/user/${name.trim()}`);
+      if (!mRes.ok) throw new Error("Minecraft player not found.");
+      
+      const mData = await mRes.json();
+      const uuid = mData.uuid;
 
-      // 2. Get Stats from Hypixel
-      // IMPORTANT: Use the variable name API_KEY (all caps) to match the definition above
-      const hypixelRes = await fetch(
-        `https://api.hypixel.net/player?key=${API_KEY}&uuid=${uuid}`
-      );
-      const hypixelData = await hypixelRes.json();
+      // 2. Get Hypixel Player Data
+      const hRes = await fetch(`https://api.hypixel.net/player?key=${API_KEY}&uuid=${uuid}`);
+      const hData = await hRes.json();
 
-      console.log("Hypixel API Response:", hypixelData); // Debugging tool
-
-      if (hypixelData.success && hypixelData.player) {
-        setPlayerData(hypixelData.player);
-        navigate('/stats');
-      } else if (hypixelData.success && !hypixelData.player) {
-        alert("This player exists in Minecraft but has never logged into Hypixel.");
+      if (hData.success && hData.player) {
+        setPlayerData(hData.player); // Update global state
+        saveHistory(mData.username); // Save to local history
+        navigate('/stats');          // Change page
       } else {
-        alert(`Hypixel API Error: ${hypixelData.cause || "Unknown Error"}`);
+        alert("This player has never joined Hypixel!");
       }
     } catch (err) {
-      console.error("Fetch error:", err);
-      alert("Network error. The API might be down or your key is invalid.");
+      console.error("Search Error:", err);
+      alert(err.message || "Failed to fetch data.");
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   return (
-    <form className="searchWrapper" onSubmit={handleSearch}>
-      <input
-        type="text"
-        placeholder="Enter player username..."
-        value={username}
-        onChange={(e) => setUserName(e.target.value)}
-        className="search-input"
-      />
-      <button type="submit" className="search-button" disabled={loading}>
-        {loading ? "..." : <FaSearch />}
-      </button>
-    </form>
+    <div className="search-section">
+      <form 
+        className="searchWrapper" 
+        onSubmit={(e) => { 
+          e.preventDefault(); 
+          fetchData(username); 
+        }}
+      >
+        <input
+          type="text"
+          placeholder="Enter Minecraft Username"
+          value={username}
+          onChange={(e) => setUserName(e.target.value)}
+          className="search-input"
+        />
+        <button type="submit" className="search-button" disabled={loading}>
+          {loading ? "..." : <FaSearch />}
+        </button>
+      </form>
+
+      {history.length > 0 && (
+        <div className="history-container">
+          <span>Recent:</span>
+          {history.map((name, i) => (
+            <button 
+              key={i} 
+              type="button" 
+              onClick={() => {
+                setUserName(name); // Optional: show name in bar when clicked
+                fetchData(name);
+              }} 
+              className="history-tag"
+            >
+              {name}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 };
 
