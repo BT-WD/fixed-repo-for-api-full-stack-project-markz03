@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { FaSearch } from "react-icons/fa";
 import './SearchBar.css';
 
-const API_KEY = "b20b5013-663e-4862-99b8-c05b69831846";
+const API_KEY = "223638ec-df9f-49cb-b24d-7cfddf28302b";
 
 const SearchBar = ({ setPlayerData }) => {
   const [username, setUserName] = useState("");
