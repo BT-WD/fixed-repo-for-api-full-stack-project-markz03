@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { HashRouter as Router, Routes, Route } from 'react-router-dom';
 import SearchBar from './components/SearchBar';
 import StatsPage from './components/StatsPage';
 import './App.css';
